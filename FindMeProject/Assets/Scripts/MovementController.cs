@@ -10,22 +10,28 @@ public class MovementController : MonoBehaviour
 
     private Vector3 velocity = Vector3.zero;
     private Rigidbody rb;
-    
+
+    public bool controlEnable;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        controlEnable = false;
     }
 
     private void Update()
     {
-        if (Input.GetKey(KeyCode.Escape))
+        if (controlEnable)
         {
-            Application.Quit();
+            if (Input.GetKey(KeyCode.Escape))
+            {
+                Application.Quit();
+            }
+
+            velocity = MovingCharacter();
+
+            RotateLight();
         }
-
-        velocity = MovingCharacter();
-
-        RotateLight();
     }
 
     private void FixedUpdate()
