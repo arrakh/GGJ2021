@@ -151,12 +151,11 @@ public class LaunchManager : MonoBehaviourPunCallbacks
         RoomOptions roomOptions = new RoomOptions();
         roomOptions.MaxPlayers = 10;
 
-        string[] WaitingPlayer = {"WaitingPlayer" };
+        string[] roomProperties = {"WaitingPlayer"};
 
-        ExitGames.Client.Photon.Hashtable customProperties = new ExitGames.Client.Photon.Hashtable() { { "WaitingPlayer", "true" } };
-
-        roomOptions.CustomRoomPropertiesForLobby = WaitingPlayer;
-        roomOptions.CustomRoomProperties = customProperties; 
+        ExitGames.Client.Photon.Hashtable waitingPlayer = new ExitGames.Client.Photon.Hashtable() { { "WaitingPlayer", "true" } };
+        roomOptions.CustomRoomPropertiesForLobby = roomProperties;
+        roomOptions.CustomRoomProperties = waitingPlayer;
 
         PhotonNetwork.CreateRoom(RoomName, roomOptions);
     }

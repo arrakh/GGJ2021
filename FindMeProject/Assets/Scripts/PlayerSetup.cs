@@ -3,24 +3,26 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 
-public class PlayerSetup : MonoBehaviourPunCallbacks
+public class PlayerSetup : MonoBehaviourPun
 {
-    [SerializeField]GameObject FpsCamera;
-    [SerializeField]GameObject Light;
+    public GameObject PlayerCamera;
+    public GameObject PlayerLight;
     // Start is called before the first frame update
     void Start()
     {
+        gameObject.tag = "Player";
         if (photonView.IsMine)
         {
             transform.GetComponent<MovementController>().enabled = true;
-            FpsCamera.GetComponent<Camera>().enabled = true;
-            Light.SetActive(true);
+            PlayerCamera.GetComponent<Camera>().enabled = true;
+            gameObject.name = PhotonNetwork.NickName;
+            PlayerLight.SetActive(true);
         }
         else
         {
             transform.GetComponent<MovementController>().enabled = false;
-            FpsCamera.GetComponent<Camera>().enabled = false;
-            Light.SetActive(false);
+            PlayerCamera.GetComponent<Camera>().enabled = false;
+            PlayerLight.SetActive(false);
         }
     }
 }

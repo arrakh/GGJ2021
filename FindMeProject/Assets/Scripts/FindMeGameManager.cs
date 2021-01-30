@@ -4,11 +4,16 @@ using UnityEngine;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 public class FindMeGameManager : MonoBehaviourPunCallbacks
 {
+    public static FindMeGameManager instance = null;
+
+    [Header("Player Spawn")]
     public GameObject PlayerPrefab;
     public List<SpawnPoint> listSpawnPoint;
+    private List<SpawnPoint> tmpSpawnPoint;
 
     [System.Serializable]
     public class SpawnPoint
@@ -17,10 +22,22 @@ public class FindMeGameManager : MonoBehaviourPunCallbacks
         public Transform transSpawnPoint;
     }
 
-    public GameObject CanvasTimerStart;
+    [Header("Panel Timer Start")]
+    public GameObject PanelTimeStart;
     public TextMeshProUGUI txtTimerStart;
 
-    public static FindMeGameManager instance = null;
+    [Header("Room Score")]
+    public TextMeshProUGUI txtPlayerName;
+    public TextMeshProUGUI txtPlayerScore;
+    public int PlayerScore = 0;
+    public GameObject PanelListRoomScore;
+    public GameObject PrefabPanelRoomListScore;
+    public Transform transContentPanelRoomListScore;
+
+    [Header("Action")]
+    public GameObject ImageAction;
+
+    private Dictionary<int, GameObject> playerListGameObject = new Dictionary<int, GameObject>();
 
     private void Awake()
     {
@@ -33,37 +50,73 @@ public class FindMeGameManager : MonoBehaviourPunCallbacks
             Destroy(gameObject);
         }
         DontDestroyOnLoad(gameObject);
+        PanelTimeStart.SetActive(true);
     }
 
     // Start is called before the first frame update
     void Start()
     {
-        CanvasTimerStart.SetActive(false);
+        tmpSpawnPoint = listSpawnPoint;
         if (PhotonNetwork.IsConnectedAndReady)
         {
-            if (PhotonNetwork.IsMasterClient)
+            txtPlayerName.text = PhotonNetwork.LocalPlayer.NickName;
+            txtPlayerScore.text = PlayerScore.ToString(); 
+
+            if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("WaitingPlayer"))
             {
-                SetSpawnPoint();
-            }
-            else
-            {
-                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("WaitingPlayer"))
+                object WaitMaster;
+                if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("WaitingPlayer", out WaitMaster))
                 {
-                    object WaitMaster;
-                    if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("WaitingPlayer", out WaitMaster))
+                    if (WaitMaster.ToString() == "true")
                     {
-                        Debug.Log(WaitMaster.ToString());
-                        if (WaitMaster.ToString() != "true")
+                        object ObjPlayerSpawnPoint;
+                        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(MultiplayerGame.PLAYER_SPAWN_POINT, out ObjPlayerSpawnPoint))
                         {
-                            int randompoint = Random.Range(0, listSpawnPoint.Count - 1);
-                            GameObject player = PhotonNetwork.Instantiate(PlayerPrefab.name, listSpawnPoint[randompoint].transSpawnPoint.position, Quaternion.identity);
-                            if (player.GetPhotonView().IsMine)
+                            Debug.Log((int)ObjPlayerSpawnPoint);
+
+                            PhotonNetwork.Instantiate(PlayerPrefab.name, listSpawnPoint[(int)ObjPlayerSpawnPoint].transSpawnPoint.position, Quaternion.identity);
+                        }
+                        else
+                        {
+                            foreach (Player player in PhotonNetwork.PlayerList)
                             {
-                                player.GetComponent<MovementController>().controlEnable = true;
+                                if (player.CustomProperties.TryGetValue(MultiplayerGame.PLAYER_SPAWN_POINT, out ObjPlayerSpawnPoint))
+                                {
+                                    tmpSpawnPoint.Remove(tmpSpawnPoint[(int)ObjPlayerSpawnPoint]);
+                                }
                             }
+                            int randomPoint = Random.Range(0, tmpSpawnPoint.Count - 1);
+                            PhotonNetwork.Instantiate(PlayerPrefab.name, tmpSpawnPoint[randomPoint].transSpawnPoint.position, Quaternion.identity);
+                            ExitGames.Client.Photon.Hashtable playerSpawnPoint = new ExitGames.Client.Photon.Hashtable() { { MultiplayerGame.PLAYER_SPAWN_POINT, randomPoint } };
+                            PhotonNetwork.LocalPlayer.SetCustomProperties(playerSpawnPoint);
                         }
                     }
+                    else
+                    {
+                        int randompoint = Random.Range(0, listSpawnPoint.Count - 1);
+                        GameObject player = PhotonNetwork.Instantiate(PlayerPrefab.name, listSpawnPoint[randompoint].transSpawnPoint.position, Quaternion.identity);
+                        player.GetComponent<TimerStartGame>().StartGame();
+                    }
                 }
+            }
+
+            if (playerListGameObject == null)
+                playerListGameObject = new Dictionary<int, GameObject>();
+
+            foreach (Player player in PhotonNetwork.PlayerList)
+            {
+                Debug.Log(player.NickName);
+                GameObject prefab = Instantiate(PrefabPanelRoomListScore, transContentPanelRoomListScore);
+                prefab.GetComponent<ListRoomScore>().Initialize(player.ActorNumber, player.NickName);
+
+                object score;
+                if (player.CustomProperties.TryGetValue(MultiplayerGame.PLAYER_SCORE_POINT, out score))
+                {
+                    prefab.GetComponent<ListRoomScore>().SetPlayerScore((int)score);
+                }
+
+                if (!playerListGameObject.ContainsKey(player.ActorNumber))
+                    playerListGameObject.Add(player.ActorNumber, prefab);
             }
         }
     }
@@ -74,6 +127,8 @@ public class FindMeGameManager : MonoBehaviourPunCallbacks
         
     }
 
+    #region Photon Call Back Method
+
     public override void OnJoinedRoom()
     {
         Debug.Log(PhotonNetwork.NickName + " joined to + " + PhotonNetwork.CurrentRoom.Name);
@@ -81,29 +136,59 @@ public class FindMeGameManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        Debug.Log(newPlayer.NickName + " joined to " + PhotonNetwork.CurrentRoom.Name + " " + PhotonNetwork.CurrentRoom.PlayerCount);
+        GameObject prefab = Instantiate(PrefabPanelRoomListScore, transContentPanelRoomListScore);
+        prefab.GetComponent<ListRoomScore>().Initialize(newPlayer.ActorNumber, newPlayer.NickName);
+
+        playerListGameObject.Add(newPlayer.ActorNumber, prefab);
     }
 
-    void SetSpawnPoint()
+    public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        foreach (Player player in PhotonNetwork.PlayerList)
+        Destroy(playerListGameObject[otherPlayer.ActorNumber].gameObject);
+        playerListGameObject.Remove(otherPlayer.ActorNumber);
+    }
+
+    public override void OnLeftRoom()
+    {
+        foreach (GameObject playerlistobject in playerListGameObject.Values)
         {
-            int randomPoint = Random.Range(0, listSpawnPoint.Count - 1);
-            if (player.IsMasterClient)
+            Destroy(playerlistobject);
+        }
+
+        playerListGameObject.Clear();
+        playerListGameObject = null;
+    }
+
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
+    {
+        GameObject prefabPanel;
+        if (playerListGameObject.TryGetValue(targetPlayer.ActorNumber, out prefabPanel))
+        {
+            object Score;
+            if (changedProps.TryGetValue(MultiplayerGame.PLAYER_SCORE_POINT, out Score))
             {
-                PhotonNetwork.Instantiate(PlayerPrefab.name, listSpawnPoint[randomPoint].transSpawnPoint.position, Quaternion.identity);
+                prefabPanel.GetComponent<ListRoomScore>().SetPlayerScore((int)Score);
             }
-            else
-            {
-                photonView.RPC("SetTargetSpawn", player, listSpawnPoint[randomPoint].NoListSpawnPoint);
-            }
-            listSpawnPoint.Remove(listSpawnPoint[randomPoint]);
         }
     }
 
-    [PunRPC]
-    public void SetTargetSpawn(int Target)
+    #endregion
+
+    #region Public Methond
+
+    public void AddScore()
     {
-        PhotonNetwork.Instantiate(PlayerPrefab.name, listSpawnPoint[Target].transSpawnPoint.position, Quaternion.identity);
+        PlayerScore += 1;
+        txtPlayerScore.text = PlayerScore.ToString();
+
+        ExitGames.Client.Photon.Hashtable intialProp = new ExitGames.Client.Photon.Hashtable() { { MultiplayerGame.PLAYER_SCORE_POINT, PlayerScore } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(intialProp);
     }
+
+    public void ButtonRoomScore()
+    {
+        PanelListRoomScore.SetActive(!PanelListRoomScore.activeSelf);
+    }
+
+    #endregion
 }

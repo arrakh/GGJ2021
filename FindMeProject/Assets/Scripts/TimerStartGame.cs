@@ -7,19 +7,12 @@ using Photon.Realtime;
 
 public class TimerStartGame : MonoBehaviourPun
 {
-    private GameObject canvasTimerStart;
     private TextMeshProUGUI txtTimerStart;
     private float timeStartRace = 5.0f;
 
     private void Awake()
     {
-        canvasTimerStart = FindMeGameManager.instance.CanvasTimerStart;
         txtTimerStart = FindMeGameManager.instance.txtTimerStart;
-    }
-
-    private void Start()
-    {
-        canvasTimerStart.SetActive(false);
     }
 
     private void Update()
@@ -29,13 +22,13 @@ public class TimerStartGame : MonoBehaviourPun
             if (timeStartRace >= 0.0f)
             {                
                 timeStartRace -= Time.deltaTime;
-                photonView.RPC("SetTime", RpcTarget.All, timeStartRace);
+                photonView.RPC("SetTime", RpcTarget.AllBuffered, timeStartRace);
             }
             else if (timeStartRace < 0.0f)
             {
                 ExitGames.Client.Photon.Hashtable customProperties = new ExitGames.Client.Photon.Hashtable() { { "WaitingPlayer", "false" } };
                 PhotonNetwork.CurrentRoom.SetCustomProperties(customProperties);
-                photonView.RPC("StartGame", RpcTarget.All);
+                photonView.RPC("StartGame", RpcTarget.AllBuffered);
                 PhotonNetwork.RemoveRPCs(photonView);
             }
         }
@@ -48,18 +41,18 @@ public class TimerStartGame : MonoBehaviourPun
         if (time > 0.0f)
         {
             txtTimerStart.text = time.ToString("F1");
-            canvasTimerStart.SetActive(true);
         }
         else
         {
             txtTimerStart.text = "";
-            canvasTimerStart.SetActive(false);
         }
     }
 
     [PunRPC]
     public void StartGame()
     {
+        FindMeGameManager.instance.PanelTimeStart.SetActive(false);
         GetComponent<MovementController>().controlEnable = true;
+        this.enabled = false;
     }
 }
